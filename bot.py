@@ -3,6 +3,7 @@ import os
 import re
 import random
 import string
+from html import escape
 from datetime import datetime
 from dotenv import load_dotenv
 from telegram import (
@@ -118,12 +119,23 @@ def make_license_key(prefix="", suffix="", length=16):
 def license_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("⚡ Auto Generate License", callback_data="admin_auto_license")],
+        [InlineKeyboardButton("🔢 Bulk Generate Keys", callback_data="admin_bulk_license")],
         [InlineKeyboardButton("✍️ Custom License", callback_data="admin_custom_license")],
         [InlineKeyboardButton("📋 License List", callback_data="admin_license_list")],
         [InlineKeyboardButton("🚫 Deactivate Key", callback_data="admin_deactivate_key")],
         [InlineKeyboardButton("✅ Activate Key", callback_data="admin_activate_key")],
         [InlineKeyboardButton("🗑 Delete Key", callback_data="admin_delete_key")],
         [InlineKeyboardButton("⬅️ Back to Admin Panel", callback_data="admin_home")]
+    ])
+
+def bulk_license_count_menu():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("10 Keys", callback_data="admin_bulk_count:10"),
+            InlineKeyboardButton("15 Keys", callback_data="admin_bulk_count:15"),
+            InlineKeyboardButton("20 Keys", callback_data="admin_bulk_count:20"),
+        ],
+        [InlineKeyboardButton("⬅️ Back", callback_data="admin_license_panel")]
     ])
 
 def is_admin(uid: int) -> bool:
@@ -608,12 +620,36 @@ def is_valid_signal_record(record):
     except Exception:
         return False
 
+def signal_direction(value):
+    signal = str(value or "").upper()
+    if signal == "BUY":
+        return "BUY"
+    if signal == "SELL":
+        return "SELL"
+    if signal == "WAIT":
+        return "WAIT"
+    return signal or "WAIT"
+
+def signal_icon(value):
+    signal = str(value or "").upper()
+    if signal == "BUY":
+        return "🟢"
+    if signal == "SELL":
+        return "🔴"
+    return "🟡"
+
 def build_signal_message(record):
     if not is_valid_signal_record(record):
         return None
 
     created = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
-    asset = clean_label(record["asset"])
+    asset = escape(clean_label(str(record["asset"])))
+    platform = escape(str(record.get("platform", "N/A")))
+    market_type = escape(str(record.get("market_type", "N/A")))
+    utc_time = escape(str(record.get("utc_time", "N/A")))
+    timeframe = escape(str(record.get("timeframe", "N/A")))
+    trend_strength = escape(str(record.get("trend_strength", "N/A")))
+    pattern = escape(str(record.get("pattern", "N/A")))
     direction = signal_direction(record["signal"])
     icon = signal_icon(record["signal"])
     confidence = f"{float(record['confidence']):.8f}"
@@ -621,14 +657,14 @@ def build_signal_message(record):
     if isinstance(reasons, str):
         reasons = [reasons]
 
-    reason_lines = "\n".join([f"• {r}" for r in reasons[:6]]) or "• Market structure and indicators aligned"
+    reason_lines = "\n".join([f"• {escape(str(r))}" for r in reasons[:6]]) or "• Market structure and indicators aligned"
 
     return (
         "<pre>"
         "╔═════════ SIGNAL ═════════╗\n\n"
         f"🔥 {asset}\n"
-        f"🕐 {record['utc_time']}\n"
-        f"⏳ {record['timeframe']}\n"
+        f"🕐 {utc_time}\n"
+        f"⏳ {timeframe}\n"
         f"{icon} {direction}\n"
         f"🎯 {confidence}\n\n"
         f"🔁 SIGNAL: {created}\n"
@@ -636,13 +672,13 @@ def build_signal_message(record):
         "</pre>\n"
         "<pre>"
         "╔══════ ANALYSIS INFO ═════╗\n\n"
-        f"📌 Platform : {record['platform']}\n"
-        f"🏷 Market   : {record['market_type']}\n"
-        f"📈 Trend    : {record['trend_strength']}\n"
+        f"📌 Platform : {platform}\n"
+        f"🏷 Market   : {market_type}\n"
+        f"📈 Trend    : {trend_strength}\n"
         f"📊 EMA      : {record['ema9']} / {record['ema21']}\n"
         f"〽️ MACD     : {record['macd_hist']}\n"
         f"⚡ RSI Zone : {record['rsi']}\n"
-        f"🕯 Candle   : {record['pattern']}\n\n"
+        f"🕯 Candle   : {pattern}\n\n"
         "╚══════════════════════════╝"
         "</pre>\n"
         "<pre>"
@@ -862,10 +898,32 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if data == "admin_auto_license":
             context.user_data["admin_flow"] = "auto_license_days"
-            context.user_data["license_data"] = {}
+            context.user_data["license_data"] = {"count": 1}
             return await safe_edit(
                 q,
                 "⚡ <b>Auto Generate License</b>\n\n"
+                "Step 1/4: Send access days.\n"
+                "Example: <code>7</code>",
+                reply_markup=admin_back_menu(),
+                parse_mode="HTML"
+            )
+
+        if data == "admin_bulk_license":
+            return await safe_edit(
+                q,
+                "🔢 <b>Bulk Generate License Keys</b>\n\n"
+                "Choose how many keys to create at once.",
+                reply_markup=bulk_license_count_menu(),
+                parse_mode="HTML"
+            )
+
+        if data.startswith("admin_bulk_count:"):
+            count = int(data.split(":", 1)[1])
+            context.user_data["admin_flow"] = "auto_license_days"
+            context.user_data["license_data"] = {"count": count}
+            return await safe_edit(
+                q,
+                f"🔢 <b>Bulk Generate {count} Keys</b>\n\n"
                 "Step 1/4: Send access days.\n"
                 "Example: <code>7</code>",
                 reply_markup=admin_back_menu(),
@@ -1007,10 +1065,18 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         record = await apply_accuracy(record)
         if is_valid_signal_record(record):
             await add_signal(uid, sess2.get("license_key", str(uid)), record)
+        message = build_signal_message(record)
+        if not message:
+            return await safe_edit(
+                q,
+                "⚠️ Signal could not be generated. Please try again.",
+                reply_markup=profile_menu(),
+                parse_mode="HTML"
+            )
         return await safe_edit(
             q,
-            build_signal_message(record),
-            reply_markup=profile_menu(),
+            message,
+            reply_markup=result_menu(),
             parse_mode="HTML"
         )
 
@@ -1248,10 +1314,18 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         record = await apply_accuracy(record)
         if is_valid_signal_record(record):
             await add_signal(uid, sess2.get("license_key", str(uid)), record)
+        message = build_signal_message(record)
+        if not message:
+            return await safe_edit(
+                q,
+                "⚠️ Signal could not be generated. Please try again.",
+                reply_markup=profile_menu(),
+                parse_mode="HTML"
+            )
         return await safe_edit(
             q,
-            build_signal_message(record),
-            reply_markup=profile_menu(),
+            message,
+            reply_markup=result_menu(),
             parse_mode="HTML"
         )
 
@@ -1428,7 +1502,9 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("❌ Send days as number. Example: 7")
         context.user_data["license_data"]["days"] = int(text)
         context.user_data["admin_flow"] = "auto_license_devices"
-        return await update.message.reply_text("📱 Device limit? Example: 1 or 10")
+        count = int(context.user_data["license_data"].get("count", 1))
+        label = "each key" if count > 1 else "this key"
+        return await update.message.reply_text(f"📱 Device limit for {label}? Example: 1 or 10")
 
     if flow == "auto_license_devices":
         if not text.isdigit():
@@ -1445,15 +1521,56 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if flow == "auto_license_suffix":
         data = context.user_data.get("license_data", {})
         suffix = "" if text.lower() == "skip" else text
-        key = make_license_key(data.get("prefix", ""), suffix, 16)
-        row = await create_license_key(key, data.get("days", 7), data.get("devices", 1))
+        count = max(1, min(20, int(data.get("count", 1))))
+        days = data.get("days", 7)
+        devices = data.get("devices", 1)
+        prefix = data.get("prefix", "")
+        existing_rows = await list_license_keys(10000)
+        existing_keys = {r["license_key"] for r in existing_rows}
+        generated_keys = set()
+        rows = []
+        attempts = 0
+
+        while len(rows) < count and attempts < count * 30:
+            attempts += 1
+            key = make_license_key(prefix, suffix, 16)
+            if key in generated_keys or key in existing_keys:
+                continue
+            row = await create_license_key(key, days, devices)
+            rows.append(row)
+            generated_keys.add(row["license_key"])
+            existing_keys.add(row["license_key"])
+
         context.user_data.pop("admin_flow", None)
         context.user_data.pop("license_data", None)
-        await update.message.reply_text(
-            f"✅ License Generated\n\n🔑 Key: <code>{row['license_key']}</code>\n📱 Devices: {row['max_devices']}\n📅 Expiry: {row['expires_at']}",
-            reply_markup=admin_bottom_keyboard(),
-            parse_mode="HTML"
-        )
+
+        if not rows:
+            await update.message.reply_text(
+                "❌ Could not generate a unique license key. Try again with a shorter prefix/suffix.",
+                reply_markup=admin_bottom_keyboard()
+            )
+            await show_admin_panel(update)
+            return True
+
+        if count == 1:
+            row = rows[0]
+            message = (
+                f"✅ License Generated\n\n"
+                f"🔑 Key: <code>{row['license_key']}</code>\n"
+                f"📱 Devices: {row['max_devices']}\n"
+                f"📅 Expiry: {row['expires_at']}"
+            )
+        else:
+            key_lines = "\n".join(f"{i}. <code>{row['license_key']}</code>" for i, row in enumerate(rows, 1))
+            message = (
+                f"✅ Bulk Licenses Generated\n\n"
+                f"Total: {len(rows)} / {count}\n"
+                f"📅 Days: {days}\n"
+                f"📱 Devices: {devices}\n\n"
+                f"{key_lines}"
+            )
+
+        await update.message.reply_text(message, reply_markup=admin_bottom_keyboard(), parse_mode="HTML")
         await show_admin_panel(update)
         return True
 
