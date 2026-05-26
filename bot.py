@@ -103,6 +103,49 @@ PLATFORM_CONFIG = {
     }
 }
 
+COMMON_MARKETS = {
+    "🔥 OTC Market": [
+        "💶 EUR/USD OTC", "💷 GBP/USD OTC", "💴 USD/JPY OTC", "🇨🇦 USD/CAD OTC",
+        "🇦🇺 AUD/USD OTC", "🇳🇿 NZD/USD OTC", "🇨🇭 USD/CHF OTC", "🇧🇷 USD/BRL OTC",
+        "🇹🇷 USD/TRY OTC", "🇮🇳 USD/INR OTC", "💵 USD/BDT OTC", "🇵🇰 USD/PKR OTC",
+        "🇲🇽 USD/MXN OTC", "🇿🇦 USD/ZAR OTC", "🇸🇬 USD/SGD OTC", "🇭🇰 USD/HKD OTC",
+    ],
+    "💱 Forex Market": [
+        "💶 EUR/USD", "💷 GBP/USD", "💴 USD/JPY", "🇨🇦 USD/CAD", "🇦🇺 AUD/USD",
+        "🇳🇿 NZD/USD", "🇨🇭 USD/CHF", "💶 EUR/GBP", "💶 EUR/JPY", "💷 GBP/JPY",
+        "🇦🇺 AUD/JPY", "🇨🇦 CAD/JPY", "🇪🇺 EUR/AUD", "🇪🇺 EUR/CAD", "🇬🇧 GBP/CAD",
+    ],
+    "🪙 Crypto Market": [
+        "🟡 BTC/USD", "🔷 ETH/USD", "🟣 BNB/USD", "🟢 SOL/USD", "⚡ XRP/USD",
+        "🐶 DOGE/USD", "🔵 ADA/USD", "🔴 DOT/USD", "⚪ LTC/USD", "🟤 TRX/USD",
+        "🟠 BCH/USD", "🔺 AVAX/USD", "🟪 MATIC/USD", "🔗 LINK/USD", "💎 TON/USD",
+    ],
+    "🥇 Commodities": [
+        "🥇 GOLD/USD", "🥈 SILVER/USD", "🛢️ WTI OIL", "🛢️ BRENT OIL",
+        "🔥 NATURAL GAS", "🟤 COPPER/USD", "⚪ PLATINUM/USD", "🟡 PALLADIUM/USD",
+    ],
+    "📈 Stock Indices": [
+        "🇺🇸 US30", "🇺🇸 NASDAQ 100", "🇺🇸 S&P 500", "🇩🇪 DAX 40",
+        "🇬🇧 FTSE 100", "🇫🇷 CAC 40", "🇯🇵 NIKKEI 225", "🇭🇰 HANG SENG",
+    ],
+    "🏦 Stocks": [
+        "🍎 Apple", "🚗 Tesla", "🛒 Amazon", "Ⓜ️ Meta", "🔎 Google",
+        "🪟 Microsoft", "🎬 Netflix", "🟩 Nvidia", "🔵 Intel", "🔴 AMD",
+    ],
+}
+
+COMMON_TIMEFRAMES = [
+    "5s", "10s", "15s", "30s", "M1", "M2", "M3", "M5", "M10", "M15",
+    "M30", "H1", "H4", "D1", "⏱ Custom Timeframe",
+]
+
+COMMON_UTC = [
+    "UTC-12", "UTC-11", "UTC-10", "UTC-9", "UTC-8", "UTC-7", "UTC-6", "UTC-5",
+    "UTC-4", "UTC-3", "UTC-2", "UTC-1", "UTC+0", "UTC+1", "UTC+2", "UTC+3",
+    "UTC+4", "UTC+5", "UTC+6", "UTC+7", "UTC+8", "UTC+9", "UTC+10", "UTC+11",
+    "UTC+12", "UTC+13", "UTC+14",
+]
+
 # Admin editable in-memory additions. Default flow never depends on this.
 CUSTOM_PLATFORMS = []
 
@@ -138,6 +181,40 @@ def bulk_license_count_menu():
         [InlineKeyboardButton("⬅️ Back", callback_data="admin_license_panel")]
     ])
 
+def skip_input_menu(callback_data):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭ Skip", callback_data=callback_data)],
+        [InlineKeyboardButton("⬅️ Back to License Panel", callback_data="admin_license_panel")]
+    ])
+
+def admin_action_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔑 License Panel", callback_data="admin_license_panel")],
+        [InlineKeyboardButton("👑 Admin Panel", callback_data="admin_home")]
+    ])
+
+def generated_license_menu(can_export=False):
+    rows = []
+    if can_export:
+        rows.append([InlineKeyboardButton("📤 Export Keys File", callback_data="admin_export_last_bulk")])
+    rows.append([InlineKeyboardButton("🔑 License Panel", callback_data="admin_license_panel")])
+    rows.append([InlineKeyboardButton("👑 Admin Panel", callback_data="admin_home")])
+    return InlineKeyboardMarkup(rows)
+
+def license_list_page_menu(page, total):
+    rows = []
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"admin_license_page:{page - 1}"))
+    if (page + 1) * 5 < total:
+        nav.append(InlineKeyboardButton("Next ➡️", callback_data=f"admin_license_page:{page + 1}"))
+    if nav:
+        rows.append(nav)
+    rows.append([InlineKeyboardButton("🗑 Delete Key", callback_data="admin_delete_key")])
+    rows.append([InlineKeyboardButton("🔑 License Panel", callback_data="admin_license_panel")])
+    rows.append([InlineKeyboardButton("👑 Admin Panel", callback_data="admin_home")])
+    return InlineKeyboardMarkup(rows)
+
 def is_admin(uid: int) -> bool:
     return uid == ADMIN_ID
 
@@ -162,17 +239,25 @@ def get_platforms():
     platforms = DEFAULT_PLATFORMS + [p for p in CUSTOM_PLATFORMS if p not in DEFAULT_PLATFORMS]
     return platforms
 
+def merge_unique(*groups):
+    merged = []
+    for group in groups:
+        for item in group or []:
+            if item not in merged:
+                merged.append(item)
+    return merged
+
 def get_platform_config(platform: str):
-    if platform in PLATFORM_CONFIG:
-        return PLATFORM_CONFIG[platform]
+    base = PLATFORM_CONFIG.get(platform, {})
+    markets = {}
+    for name, assets in (base.get("markets") or {}).items():
+        markets[name] = merge_unique(assets)
+    for name, assets in COMMON_MARKETS.items():
+        markets[name] = merge_unique(markets.get(name, []), assets)
     return {
-        "markets": {
-            "🪙 Crypto Market": ["🟡 BTC/USD", "🔷 ETH/USD", "🟢 SOL/USD"],
-            "💱 Forex Market": ["💶 EUR/USD", "💷 GBP/USD", "💴 USD/JPY"],
-            "🔥 OTC Market": ["💶 EUR/USD OTC", "💷 GBP/USD OTC", "💴 USD/JPY OTC"]
-        },
-        "timeframes": ["5s", "10s", "15s", "30s", "M1", "M2", "M3", "M5", "M10", "M15", "M30", "H1", "H4", "⏱ Custom Timeframe"],
-        "utc": ["UTC-12", "UTC-11", "UTC-10", "UTC-9", "UTC-8", "UTC-7", "UTC-6", "UTC-5", "UTC-4", "UTC-3", "UTC-2", "UTC-1", "UTC+0", "UTC+1", "UTC+2", "UTC+3", "UTC+4", "UTC+5", "UTC+6", "UTC+7", "UTC+8", "UTC+9", "UTC+10", "UTC+11", "UTC+12", "UTC+13", "UTC+14"]
+        "markets": markets,
+        "timeframes": merge_unique(base.get("timeframes", []), COMMON_TIMEFRAMES),
+        "utc": merge_unique(base.get("utc", []), COMMON_UTC),
     }
 
 async def load_platforms():
@@ -200,7 +285,7 @@ async def load_markets(platform):
 
 async def load_assets(platform, market):
     cfg = get_platform_config(platform)
-    assets = cfg["markets"].get(market, [])
+    assets = list(cfg["markets"].get(market, []))
     try:
         dyn = await get_dynamic_assets(platform, market)
         for a in dyn:
@@ -339,7 +424,6 @@ def user_detail_menu(license_key):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🚫 Ban", callback_data=f"ban_key:{license_key}"),
          InlineKeyboardButton("✅ Unban", callback_data=f"unban_key:{license_key}")],
-        [InlineKeyboardButton("🗑 Delete", callback_data=f"delete_key:{license_key}")],
         [InlineKeyboardButton("⬅️ Back to Users", callback_data="admin_users")]
     ])
 
@@ -379,8 +463,28 @@ def accuracy_menu():
 def admin_back_menu():
     return InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Admin Panel", callback_data="admin_home")]])
 
+def bot_info_text():
+    return (
+        "<b>ℹ️ Bot Information</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🤖 Professional market signal assistant for fast platform, market, asset, timeframe and UTC based analysis.\n\n"
+        "📊 <b>Flow</b>\n"
+        "Platform → Market → Asset → Timeframe → UTC → Signal Result\n\n"
+        "🧠 <b>Analysis</b>\n"
+        "EMA trend, MACD momentum, RSI zone, candle pattern, confidence range and market-based reasons.\n\n"
+        "⚠️ Trading involves risk. Use proper risk management."
+    )
+
 async def post_init(app):
     await init_db()
+    global ACCURACY_RANGE
+    try:
+        mode = await get_accuracy_mode()
+        if mode and mode != "auto" and "-" in mode:
+            low, high = [int(x) for x in mode.split("-", 1)]
+            ACCURACY_RANGE = (min(low, high), max(low, high))
+    except Exception:
+        ACCURACY_RANGE = None
 
 async def show_admin_panel(target):
     text = (
@@ -497,9 +601,11 @@ async def do_license_login(update: Update, context: ContextTypes.DEFAULT_TYPE, l
     key = clean_license_key(license_key)
     if len(key) != 16:
         return await update.message.reply_text(
-            "❌ <b>Invalid License Key</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-            "License key must be exactly 16 characters.\n\n"
-            "Example: <code>VIPA1B2C3D4E5F6</code>",
+            "❌ <b>License Key Format Not Recognized</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Please enter a 16-character key using only letters and numbers.\n\n"
+            "Example: <code>VIPA1B2C3D4E5F6</code>\n\n"
+            "Check for missing characters, extra spaces, or copied symbols and try again.",
             reply_markup=guest_bottom_keyboard(),
             parse_mode="HTML"
         )
@@ -507,8 +613,10 @@ async def do_license_login(update: Update, context: ContextTypes.DEFAULT_TYPE, l
     ok, msg, lic = await login_with_license(update.effective_user.id, key)
     if not ok:
         return await update.message.reply_text(
-            "⛔ <b>LICENSE LOGIN FAILED</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-            f"{msg}\n\nPlease check your license key or contact admin.",
+            "⛔ <b>License Verification Failed</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"<b>Reason:</b> {escape(str(msg))}\n\n"
+            "Please confirm the key is active, not expired, and copied exactly as provided by the admin.",
             reply_markup=guest_bottom_keyboard(),
             parse_mode="HTML"
         )
@@ -603,6 +711,85 @@ async def apply_accuracy(record):
             pass
 
     return record
+
+async def finish_auto_license_generation(context, suffix):
+    data = context.user_data.get("license_data", {})
+    count = max(1, min(20, int(data.get("count", 1))))
+    days = int(data.get("days", 7))
+    devices = int(data.get("devices", 1))
+    prefix = data.get("prefix", "")
+    suffix = "" if str(suffix).lower() == "skip" else suffix
+
+    existing_rows = await list_license_keys(10000)
+    existing_keys = {r["license_key"] for r in existing_rows}
+    generated_keys = set()
+    rows = []
+    attempts = 0
+
+    while len(rows) < count and attempts < count * 40:
+        attempts += 1
+        key = make_license_key(prefix, suffix, 16)
+        if key in generated_keys or key in existing_keys:
+            continue
+        row = await create_license_key(key, days, devices)
+        rows.append(row)
+        generated_keys.add(row["license_key"])
+        existing_keys.add(row["license_key"])
+
+    context.user_data.pop("admin_flow", None)
+    context.user_data.pop("license_data", None)
+
+    if not rows:
+        return (
+            "❌ Could not generate a unique license key. Try again with a shorter prefix/suffix.",
+            admin_action_menu()
+        )
+
+    export_rows = [dict(row) for row in rows]
+    context.user_data["last_bulk_license_export"] = {
+        "rows": export_rows,
+        "days": days,
+        "devices": devices,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    if count == 1:
+        row = rows[0]
+        message = (
+            f"✅ License Generated\n\n"
+            f"🔑 Key: <code>{row['license_key']}</code>\n"
+            f"📱 Devices: {row['max_devices']}\n"
+            f"📅 Expiry: {row['expires_at']}"
+        )
+    else:
+        key_lines = "\n".join(f"{i}. <code>{row['license_key']}</code>" for i, row in enumerate(rows, 1))
+        message = (
+            f"✅ Bulk Licenses Generated\n\n"
+            f"Total: {len(rows)} / {count}\n"
+            f"📅 Days: {days}\n"
+            f"📱 Devices: {devices}\n\n"
+            f"{key_lines}"
+        )
+
+    return message, generated_license_menu(can_export=count > 1)
+
+def build_bulk_license_export(export_data):
+    rows = export_data.get("rows", [])
+    lines = [
+        "BULK LICENSE EXPORT",
+        "===================",
+        f"Generated At: {export_data.get('created_at', 'N/A')}",
+        f"Access Days: {export_data.get('days', 'N/A')}",
+        f"Device Limit: {export_data.get('devices', 'N/A')}",
+        f"Total Keys: {len(rows)}",
+        "",
+    ]
+    for i, row in enumerate(rows, 1):
+        lines.append(f"{i}. {row.get('license_key', 'N/A')}")
+        lines.append(f"   Devices: {row.get('max_devices', 'N/A')}")
+        lines.append(f"   Expiry: {row.get('expires_at', 'N/A')}")
+        lines.append("")
+    return "\n".join(lines)
 
 def accuracy_mode_text_sync_placeholder():
     return "AUTO / DEFAULT"
@@ -723,6 +910,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if is_admin(uid) and (data.startswith("admin_") or data.startswith("accuracy_")):
         if data == "admin_home":
+            for key in ["admin_flow", "license_data", "section_platform", "section_market"]:
+                context.user_data.pop(key, None)
             return await show_admin_panel(q)
 
         if data == "admin_create_user":
@@ -752,6 +941,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data == "accuracy_auto":
             global ACCURACY_RANGE
             ACCURACY_RANGE = None
+            await set_accuracy_mode("auto")
             return await safe_edit(
                 q,
                 "✅ <b>Accuracy Mode Updated</b>\n"
@@ -804,17 +994,17 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data.startswith("ban_key:"):
             key = data.split(":", 1)[1]
             await set_license_active(key, False)
-            return await safe_edit(q, "🚫 User/license banned.", reply_markup=admin_menu())
+            return await safe_edit(q, "🚫 User/license banned.", reply_markup=user_detail_menu(key))
 
         if data.startswith("unban_key:"):
             key = data.split(":", 1)[1]
             await set_license_active(key, True)
-            return await safe_edit(q, "✅ User/license unbanned.", reply_markup=admin_menu())
+            return await safe_edit(q, "✅ User/license unbanned.", reply_markup=user_detail_menu(key))
 
         if data.startswith("delete_key:"):
             key = data.split(":", 1)[1]
             await delete_license_key(key)
-            return await safe_edit(q, "🗑 User/license deleted.", reply_markup=admin_menu())
+            return await safe_edit(q, "🗑 User/license deleted.", reply_markup=admin_action_menu())
 
         if data == "admin_ban":
             context.user_data["admin_flow"] = "deactivate_license"
@@ -894,6 +1084,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await safe_edit(q, txt, reply_markup=admin_menu(), parse_mode="HTML")
 
         if data == "admin_license_panel":
+            for key in ["admin_flow", "license_data", "section_platform", "section_market"]:
+                context.user_data.pop(key, None)
             return await safe_edit(q, "🔑 <b>License Key Panel</b>", reply_markup=license_menu(), parse_mode="HTML")
 
         if data == "admin_auto_license":
@@ -930,6 +1122,31 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
 
+        if data == "admin_license_prefix_skip":
+            context.user_data.setdefault("license_data", {})["prefix"] = ""
+            context.user_data["admin_flow"] = "auto_license_suffix"
+            return await safe_edit(
+                q,
+                "🔤 <b>Suffix</b>\n\nSend 1-5 letters/numbers or tap Skip.",
+                reply_markup=skip_input_menu("admin_license_suffix_skip"),
+                parse_mode="HTML"
+            )
+
+        if data == "admin_license_suffix_skip":
+            message, menu = await finish_auto_license_generation(context, "")
+            return await safe_edit(q, message, reply_markup=menu, parse_mode="HTML")
+
+        if data == "admin_export_last_bulk":
+            export_data = context.user_data.get("last_bulk_license_export")
+            if not export_data or not export_data.get("rows"):
+                return await safe_edit(q, "❌ No bulk keys available to export yet.", reply_markup=admin_action_menu())
+            file_path = f"/tmp/bulk_license_keys_{uid}.txt"
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(build_bulk_license_export(export_data))
+            with open(file_path, "rb") as f:
+                await q.message.reply_document(document=f, filename="bulk_license_keys.txt")
+            return await safe_edit(q, "📤 Bulk license export file sent.", reply_markup=generated_license_menu(can_export=True))
+
         if data == "admin_custom_license":
             context.user_data["admin_flow"] = "custom_license_key"
             context.user_data["license_data"] = {}
@@ -943,17 +1160,37 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         if data == "admin_license_list":
-            keys = await list_license_keys(100)
+            keys = await list_license_keys(200)
             if not keys:
                 return await safe_edit(q, "📋 No license keys found.", reply_markup=license_menu())
-            lines = ["<b>📋 License Keys</b>", "━━━━━━━━━━━━━━━━━━━━"]
-            for k in keys[:60]:
+            page = 0
+            page_keys = keys[page * 5:(page + 1) * 5]
+            total_pages = max(1, (len(keys) + 4) // 5)
+            lines = ["<b>📋 License Keys</b>", f"Page {page + 1}/{total_pages}", "━━━━━━━━━━━━━━━━━━━━"]
+            for k in page_keys:
                 status = "✅ Active" if k["active"] else "🚫 Disabled"
                 lines.append(
                     f"<code>{k['license_key']}</code>\n"
                     f"{status} | Devices {k['used_devices']}/{k['max_devices']} | Exp {str(k['expires_at'])[:16]}"
                 )
-            return await safe_edit(q, "\n\n".join(lines), reply_markup=license_menu(), parse_mode="HTML")
+            return await safe_edit(q, "\n\n".join(lines), reply_markup=license_list_page_menu(page, len(keys)), parse_mode="HTML")
+
+        if data.startswith("admin_license_page:"):
+            page = max(0, int(data.split(":", 1)[1]))
+            keys = await list_license_keys(200)
+            if not keys:
+                return await safe_edit(q, "📋 No license keys found.", reply_markup=license_menu())
+            total_pages = max(1, (len(keys) + 4) // 5)
+            page = min(page, total_pages - 1)
+            page_keys = keys[page * 5:(page + 1) * 5]
+            lines = ["<b>📋 License Keys</b>", f"Page {page + 1}/{total_pages}", "━━━━━━━━━━━━━━━━━━━━"]
+            for k in page_keys:
+                status = "✅ Active" if k["active"] else "🚫 Disabled"
+                lines.append(
+                    f"<code>{k['license_key']}</code>\n"
+                    f"{status} | Devices {k['used_devices']}/{k['max_devices']} | Exp {str(k['expires_at'])[:16]}"
+                )
+            return await safe_edit(q, "\n\n".join(lines), reply_markup=license_list_page_menu(page, len(keys)), parse_mode="HTML")
 
         if data == "admin_deactivate_key":
             context.user_data["admin_flow"] = "deactivate_license"
@@ -965,7 +1202,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if data == "admin_delete_key":
             context.user_data["admin_flow"] = "delete_license"
-            return await safe_edit(q, "🗑 Send license key to delete.", reply_markup=admin_back_menu())
+            return await safe_edit(
+                q,
+                "🗑 <b>Delete License</b>\n\nCopy a license key from the list and paste it here to delete.",
+                reply_markup=admin_back_menu(),
+                parse_mode="HTML"
+            )
 
         if data == "admin_stats":
             keys = await list_license_keys(100)
@@ -1108,14 +1350,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu_info":
         return await safe_edit(
             q,
-            "<b>ℹ️ Bot Information</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🤖 This bot provides professional market signal analysis using indicator-based logic.\n\n"
-            "📊 <b>How it works</b>\n"
-            "Platform → Market → Asset → Timeframe → UTC → Signal Result\n\n"
-            "🧠 <b>Analysis includes</b>\n"
-            "EMA trend, MACD momentum, RSI zone, candle pattern, trend bias, market-based reasons, and global UTC timezone selection.\n\n"
-            "⚠️ Trading involves risk. Use proper risk management.",
+            bot_info_text(),
             reply_markup=main_menu_only(),
             parse_mode="HTML"
         )
@@ -1364,30 +1599,26 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u = await create_user(info["username"], info["password"], int(text))
         context.user_data.pop("admin_flow", None)
         context.user_data.pop("new_user", None)
-        await update.message.reply_text(f"✅ User Created\n\nUsername: {u['username']}\nPassword: {info['password']}\nDays: {text}\nExpiry: {u['expires_at']}\n\nLogin:\n/login {u['username']} {info['password']}", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text(f"✅ User Created\n\nUsername: {u['username']}\nPassword: {info['password']}\nDays: {text}\nExpiry: {u['expires_at']}\n\nLogin:\n/login {u['username']} {info['password']}", reply_markup=admin_action_menu())
         return True
 
     if flow == "ban_username":
         row = await set_ban(text.lower(), True)
         context.user_data.pop("admin_flow", None)
-        await update.message.reply_text("🚫 User banned." if row else "❌ Username not found.", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text("🚫 User banned." if row else "❌ Username not found.", reply_markup=admin_action_menu())
         return True
 
     if flow == "unban_username":
         row = await set_ban(text.lower(), False)
         context.user_data.pop("admin_flow", None)
-        await update.message.reply_text("✅ User unbanned." if row else "❌ Username not found.", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text("✅ User unbanned." if row else "❌ Username not found.", reply_markup=admin_action_menu())
         return True
 
     if flow == "add_platform":
         if text not in CUSTOM_PLATFORMS and text not in DEFAULT_PLATFORMS:
             CUSTOM_PLATFORMS.append(text)
         context.user_data.pop("admin_flow", None)
-        await update.message.reply_text(f"✅ Platform added: {text}", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text(f"✅ Platform added: {text}", reply_markup=admin_action_menu())
         return True
 
     if flow == "remove_platform":
@@ -1397,8 +1628,7 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             msg = "ℹ️ Default platforms cannot be removed from the fallback list."
         context.user_data.pop("admin_flow", None)
-        await update.message.reply_text(msg, reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text(msg, reply_markup=admin_action_menu())
         return True
 
 
@@ -1413,8 +1643,7 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await add_dynamic_market(platform, text)
         context.user_data.pop("admin_flow", None)
         context.user_data.pop("section_platform", None)
-        await update.message.reply_text(f"✅ Market added\nPlatform: {platform}\nMarket: {text}", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text(f"✅ Market added\nPlatform: {platform}\nMarket: {text}", reply_markup=admin_action_menu())
         return True
 
     if flow == "add_asset_platform":
@@ -1436,8 +1665,7 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("admin_flow", None)
         context.user_data.pop("section_platform", None)
         context.user_data.pop("section_market", None)
-        await update.message.reply_text(f"✅ Asset added\nPlatform: {platform}\nMarket: {market}\nAsset: {text}", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text(f"✅ Asset added\nPlatform: {platform}\nMarket: {market}\nAsset: {text}", reply_markup=admin_action_menu())
         return True
 
     if flow == "add_timeframe_platform":
@@ -1451,8 +1679,7 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await add_dynamic_timeframe(platform, text)
         context.user_data.pop("admin_flow", None)
         context.user_data.pop("section_platform", None)
-        await update.message.reply_text(f"✅ Timeframe added\nPlatform: {platform}\nTimeframe: {text}", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text(f"✅ Timeframe added\nPlatform: {platform}\nTimeframe: {text}", reply_markup=admin_action_menu())
         return True
 
     if flow == "add_utc_platform":
@@ -1466,8 +1693,7 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await add_dynamic_utc(platform, text)
         context.user_data.pop("admin_flow", None)
         context.user_data.pop("section_platform", None)
-        await update.message.reply_text(f"✅ UTC added\nPlatform: {platform}\nUTC: {text}", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text(f"✅ UTC added\nPlatform: {platform}\nUTC: {text}", reply_markup=admin_action_menu())
         return True
 
 
@@ -1477,8 +1703,8 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("admin_flow", None)
         if raw in ["default", "auto", "reset"]:
             ACCURACY_RANGE = None
-            await update.message.reply_text("✅ Accuracy set to AUTO / DEFAULT mode.", reply_markup=admin_bottom_keyboard())
-            await show_admin_panel(update)
+            await set_accuracy_mode("auto")
+            await update.message.reply_text("✅ Accuracy set to AUTO / DEFAULT mode.", reply_markup=admin_action_menu())
             return True
         try:
             parts = raw.replace(":", "-").split("-")
@@ -1488,12 +1714,11 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             low = max(60, low)
             high = min(99, high)
             ACCURACY_RANGE = (low, high)
-            await update.message.reply_text(f"✅ Accuracy updated successfully.\n🎯 Active Range: {low}% - {high}%", reply_markup=admin_bottom_keyboard())
-            await show_admin_panel(update)
+            await set_accuracy_mode(f"{low}-{high}")
+            await update.message.reply_text(f"✅ Accuracy updated successfully.\n🎯 Active Range: {low}% - {high}%", reply_markup=admin_action_menu())
             return True
         except Exception:
-            await update.message.reply_text("❌ Invalid format.\n\nExamples:\n80-90\n75-93\n90-93", reply_markup=admin_bottom_keyboard())
-            await show_admin_panel(update)
+            await update.message.reply_text("❌ Invalid format.\n\nExamples:\n80-90\n75-93\n90-93", reply_markup=admin_action_menu())
             return True
 
 
@@ -1511,67 +1736,24 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("❌ Send device limit as number. Example: 1")
         context.user_data["license_data"]["devices"] = int(text)
         context.user_data["admin_flow"] = "auto_license_prefix"
-        return await update.message.reply_text("🔤 Prefix? Send 1-5 letters/numbers or send skip.")
+        return await update.message.reply_text(
+            "🔤 <b>Prefix</b>\n\nSend 1-5 letters/numbers or tap Skip.",
+            reply_markup=skip_input_menu("admin_license_prefix_skip"),
+            parse_mode="HTML"
+        )
 
     if flow == "auto_license_prefix":
         context.user_data["license_data"]["prefix"] = "" if text.lower() == "skip" else text
         context.user_data["admin_flow"] = "auto_license_suffix"
-        return await update.message.reply_text("🔤 Suffix? Send 1-5 letters/numbers or send skip.")
+        return await update.message.reply_text(
+            "🔤 <b>Suffix</b>\n\nSend 1-5 letters/numbers or tap Skip.",
+            reply_markup=skip_input_menu("admin_license_suffix_skip"),
+            parse_mode="HTML"
+        )
 
     if flow == "auto_license_suffix":
-        data = context.user_data.get("license_data", {})
-        suffix = "" if text.lower() == "skip" else text
-        count = max(1, min(20, int(data.get("count", 1))))
-        days = data.get("days", 7)
-        devices = data.get("devices", 1)
-        prefix = data.get("prefix", "")
-        existing_rows = await list_license_keys(10000)
-        existing_keys = {r["license_key"] for r in existing_rows}
-        generated_keys = set()
-        rows = []
-        attempts = 0
-
-        while len(rows) < count and attempts < count * 30:
-            attempts += 1
-            key = make_license_key(prefix, suffix, 16)
-            if key in generated_keys or key in existing_keys:
-                continue
-            row = await create_license_key(key, days, devices)
-            rows.append(row)
-            generated_keys.add(row["license_key"])
-            existing_keys.add(row["license_key"])
-
-        context.user_data.pop("admin_flow", None)
-        context.user_data.pop("license_data", None)
-
-        if not rows:
-            await update.message.reply_text(
-                "❌ Could not generate a unique license key. Try again with a shorter prefix/suffix.",
-                reply_markup=admin_bottom_keyboard()
-            )
-            await show_admin_panel(update)
-            return True
-
-        if count == 1:
-            row = rows[0]
-            message = (
-                f"✅ License Generated\n\n"
-                f"🔑 Key: <code>{row['license_key']}</code>\n"
-                f"📱 Devices: {row['max_devices']}\n"
-                f"📅 Expiry: {row['expires_at']}"
-            )
-        else:
-            key_lines = "\n".join(f"{i}. <code>{row['license_key']}</code>" for i, row in enumerate(rows, 1))
-            message = (
-                f"✅ Bulk Licenses Generated\n\n"
-                f"Total: {len(rows)} / {count}\n"
-                f"📅 Days: {days}\n"
-                f"📱 Devices: {devices}\n\n"
-                f"{key_lines}"
-            )
-
-        await update.message.reply_text(message, reply_markup=admin_bottom_keyboard(), parse_mode="HTML")
-        await show_admin_panel(update)
+        message, menu = await finish_auto_license_generation(context, text)
+        await update.message.reply_text(message, reply_markup=menu, parse_mode="HTML")
         return True
 
     if flow == "custom_license_key":
@@ -1598,34 +1780,30 @@ async def admin_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("license_data", None)
         await update.message.reply_text(
             f"✅ Custom License Created\n\n🔑 Key: <code>{row['license_key']}</code>\n📱 Devices: {row['max_devices']}\n📅 Expiry: {row['expires_at']}",
-            reply_markup=admin_bottom_keyboard(),
+            reply_markup=admin_action_menu(),
             parse_mode="HTML"
         )
-        await show_admin_panel(update)
         return True
 
     if flow == "deactivate_license":
         key = clean_license_key(text)
         row = await set_license_active(key, False)
         context.user_data.pop("admin_flow", None)
-        await update.message.reply_text("🚫 License deactivated." if row else "❌ License not found.", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text("🚫 License deactivated." if row else "❌ License not found.", reply_markup=admin_action_menu())
         return True
 
     if flow == "activate_license":
         key = clean_license_key(text)
         row = await set_license_active(key, True)
         context.user_data.pop("admin_flow", None)
-        await update.message.reply_text("✅ License activated." if row else "❌ License not found.", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text("✅ License activated." if row else "❌ License not found.", reply_markup=admin_action_menu())
         return True
 
     if flow == "delete_license":
         key = clean_license_key(text)
         row = await delete_license_key(key)
         context.user_data.pop("admin_flow", None)
-        await update.message.reply_text("🗑 License deleted." if row else "❌ License not found.", reply_markup=admin_bottom_keyboard())
-        await show_admin_panel(update)
+        await update.message.reply_text("🗑 License deleted." if row else "❌ License not found.", reply_markup=admin_action_menu())
         return True
 
     return False
@@ -1640,6 +1818,14 @@ async def user_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text == "👑 Admin Panel":
             return await show_admin_panel(update)
         return
+
+    if text == "ℹ️ Info Bot":
+        ok, _ = await license_session_active(update.effective_user.id)
+        return await update.message.reply_text(
+            bot_info_text(),
+            reply_markup=user_bottom_keyboard() if ok else guest_bottom_keyboard(),
+            parse_mode="HTML"
+        )
 
     flow = context.user_data.get("user_flow")
 
@@ -1718,7 +1904,7 @@ async def user_text_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await send_history_export(update, context, update.effective_user.id)
 
     if text == "ℹ️ Info Bot":
-        return await update.message.reply_text("<b>ℹ️ Bot Information</b>\n━━━━━━━━━━━━━━━━━━━━\n🤖 This bot provides professional market signal analysis using indicator-based logic.\n\n📊 <b>How it works</b>\nPlatform → Market → Asset → Timeframe → UTC → Signal Result\n\n🧠 <b>Analysis includes</b>\nEMA trend, MACD momentum, RSI zone, candle pattern, trend bias, market-based reasons, and global UTC timezone selection.\n\n⚠️ Trading involves risk. Use proper risk management.", reply_markup=user_bottom_keyboard() if ok else guest_bottom_keyboard(), parse_mode="HTML")
+        return await update.message.reply_text(bot_info_text(), reply_markup=user_bottom_keyboard() if ok else guest_bottom_keyboard(), parse_mode="HTML")
 
     if text == "🚪 Logout":
         await license_logout(update.effective_user.id)

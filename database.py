@@ -4,6 +4,10 @@ import asyncpg
 from datetime import datetime, timedelta, timezone
 
 pool = None
+dynamic_tables_ready = False
+license_tables_ready = False
+bot_settings_ready = False
+signal_session_columns_ready = False
 
 async def init_db():
     global pool
@@ -267,6 +271,9 @@ async def force_logout_username(username):
 
 
 async def ensure_dynamic_tables():
+    global dynamic_tables_ready
+    if dynamic_tables_ready:
+        return
     p = await init_db()
     async with p.acquire() as conn:
         await conn.execute("""
@@ -314,6 +321,7 @@ async def ensure_dynamic_tables():
             UNIQUE(platform_name, name)
         );
         """)
+    dynamic_tables_ready = True
 
 async def add_dynamic_platform(name):
     await ensure_dynamic_tables()
@@ -421,6 +429,9 @@ async def get_dynamic_utc(platform):
 # ================= LICENSE KEY LOGIN SYSTEM =================
 
 async def ensure_license_tables():
+    global license_tables_ready
+    if license_tables_ready:
+        return
     p = await init_db()
     async with p.acquire() as conn:
         await conn.execute("""
@@ -443,6 +454,7 @@ async def ensure_license_tables():
             UNIQUE(license_key, telegram_id)
         );
         """)
+    license_tables_ready = True
 
 async def create_license_key(license_key, days, max_devices=1):
     await ensure_license_tables()
@@ -546,6 +558,9 @@ async def delete_license_key(license_key):
 # ================= ACCURACY RATE SETTINGS =================
 
 async def ensure_bot_settings():
+    global bot_settings_ready
+    if bot_settings_ready:
+        return
     p = await init_db()
     async with p.acquire() as conn:
         await conn.execute("""
@@ -558,6 +573,7 @@ async def ensure_bot_settings():
         VALUES('accuracy_mode', 'auto')
         ON CONFLICT(key) DO NOTHING;
         """)
+    bot_settings_ready = True
 
 async def set_accuracy_mode(value):
     await ensure_bot_settings()
@@ -580,6 +596,9 @@ async def get_accuracy_mode():
 # ================= LICENSE SESSION SIGNAL FLOW UPDATE OVERRIDE V54 =================
 
 async def ensure_signal_session_columns():
+    global signal_session_columns_ready
+    if signal_session_columns_ready:
+        return
     await ensure_license_tables()
     p = await init_db()
     async with p.acquire() as conn:
@@ -590,6 +609,7 @@ async def ensure_signal_session_columns():
         ALTER TABLE license_sessions ADD COLUMN IF NOT EXISTS timeframe TEXT;
         ALTER TABLE license_sessions ADD COLUMN IF NOT EXISTS utc_time TEXT;
         """)
+    signal_session_columns_ready = True
 
 async def update_session(telegram_id, **kwargs):
     await ensure_signal_session_columns()
